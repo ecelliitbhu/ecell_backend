@@ -88,7 +88,7 @@ router.post("/", async (req, res) => {
       },
     });
 
-    console.log("Post created successfully:", post.id);
+    // console.log("Post created successfully:", post.id);
     return res.status(201).json(post);
   } catch (error) {
     console.error("Error creating post:", error);
