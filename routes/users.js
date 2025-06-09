@@ -55,4 +55,33 @@ router.get("/find", async (req, res) => {
   }
 });
 
+// GET /users/:id → find user by ID
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+  if (!id) {
+    return res.status(400).json({ message: "Missing user ID in URL parameter" });
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id },
+      include: {
+        student: true,
+        recruiter: true,
+        ambassador: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json(user);
+  } catch (error) {
+    console.error("Error fetching user by ID:", error);
+    return res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 export default router;

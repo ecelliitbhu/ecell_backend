@@ -68,10 +68,10 @@ router.put("/:id", async (req, res) => {
 
 // POST /recruiters → Create recruiter if not exists
 router.post("/", async (req, res) => {
-  const { userId } = req.body;
+  const { userId, companyName, websiteUrl, address } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ message: "Missing userId or email" });
+    return res.status(400).json({ message: "Missing userId" });
   }
 
   try {
@@ -86,9 +86,9 @@ router.post("/", async (req, res) => {
     const newRecruiter = await prisma.recruiter.create({
       data: {
         userId,
-        companyName: "",
-        websiteUrl: "",
-        address: "",
+        companyName: companyName || "", // fallback to empty string if undefined
+        websiteUrl: websiteUrl || "",
+        address: address || "",
       },
     });
 

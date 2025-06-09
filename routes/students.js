@@ -80,10 +80,21 @@ router.put("/:id", async (req, res) => {
 
 // POST /students → create new student
 router.post("/", async (req, res) => {
-  const { userId } = req.body;
+  const {
+    userId,
+    name,
+    rollNo,
+    branch,
+    cpi,
+    courseType,
+    year,
+    linkedinUrl,
+    githubUrl,
+    resumeUrl,
+  } = req.body;
 
   if (!userId) {
-    return res.status(400).json({ message: "Missing userId or email" });
+    return res.status(400).json({ message: "Missing userId" });
   }
 
   try {
@@ -98,15 +109,15 @@ router.post("/", async (req, res) => {
     const newStudent = await prisma.student.create({
       data: {
         userId,
-        name: "",
-        rollNo: "",
-        branch: "",
-        cpi: 0,
-        courseType: "",
-        year: 1,
-        linkedinUrl: "",
-        githubUrl: "",
-        resumeUrl: "",
+        name,
+        rollNo,
+        branch,
+        cpi,
+        courseType,
+        year,
+        linkedinUrl,
+        githubUrl,
+        resumeUrl,
       },
     });
 
@@ -116,5 +127,6 @@ router.post("/", async (req, res) => {
     return res.status(500).json({ message: "Internal server error" });
   }
 });
+
 
 export default router;
