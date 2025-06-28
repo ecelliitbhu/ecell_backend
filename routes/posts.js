@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 const router = express.Router();
 
 // GET /posts → Get all posts
-router.get("/", async (req, res) => {
+router.get("/getinfo", async (req, res) => {
   try {
     console.log("Fetching all posts...");
 
@@ -36,12 +36,12 @@ router.get("/", async (req, res) => {
     console.error("Error fetching posts:", error);
     return res
       .status(500)
-      .json({ message: "Internal server error", error: error.message });
+      .json({ message: "Error fetching posts", error: error.message });
   }
 });
 
 // POST /posts → Create a new post
-router.post("/", async (req, res) => {
+router.post("/create", async (req, res) => {
   const {
     recruiterId,
     companyName,
@@ -94,12 +94,12 @@ router.post("/", async (req, res) => {
     console.error("Error creating post:", error);
     return res
       .status(500)
-      .json({ message: "Internal server error", error: error.message });
+      .json({ message: "Error creating post", error: error.message });
   }
 });
 
 // GET /posts/:id → Get a single post
-router.get("/:id", async (req, res) => {
+router.get("/getpost/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -122,12 +122,12 @@ router.get("/:id", async (req, res) => {
     return res.status(200).json(post);
   } catch (error) {
     console.error("Error fetching post:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error fetching post" });
   }
 });
 
 // PUT /posts/:id → Update a post
-router.put("/:id", async (req, res) => {
+router.put("/update/:id", async (req, res) => {
   const { id } = req.params;
   const {
     companyName,
@@ -160,12 +160,12 @@ router.put("/:id", async (req, res) => {
     return res.status(200).json(post);
   } catch (error) {
     console.error("Error updating post:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error updating post" });
   }
 });
 
 // DELETE /posts/:id → Delete a post and its applications
-router.delete("/:id", async (req, res) => {
+router.delete("/delete/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -182,7 +182,7 @@ router.delete("/:id", async (req, res) => {
     return res.status(200).json({ message: "Post deleted successfully" });
   } catch (error) {
     console.error("Error deleting post:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error deleting post" });
   }
 });
 

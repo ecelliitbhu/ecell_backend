@@ -3,8 +3,60 @@ import prisma from "../lib/prisma.js";
 
 const router = express.Router();
 
-// POST /users/create → create user if doesn't exist
+// // POST /users/create → create user if doesn't exist
+// router.post("/create", async (req, res) => {
+//   const { email } = req.body;
+
+//   if (!email) {
+//     return res.status(400).json({ message: "Missing email in request body" });
+//   }
+
+//   try {
+//     const existingUser = await prisma.user.findUnique({ where: { email } });
+
+//     if (existingUser) {
+//       return res.status(200).json(existingUser);
+//     }
+
+//     const newUser = await prisma.user.create({ data: { email } });
+//     return res.status(201).json(newUser);
+//   } catch (error) {
+//     console.error("Error creating user:", error);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
+// // GET /users/find?email=... → find user by email
+// router.get("/find", async (req, res) => {
+//   const { email } = req.query;
+
+//   if (!email) {
+//     return res.status(400).json({ message: "Missing email in query" });
+//   }
+
+//   try {
+//     const user = await prisma.user.findUnique({
+//       where: { email },
+//       include: {
+//         student: true,
+//         recruiter: true,
+//         ambassador: true,
+//       },
+//     });
+
+//     if (!user) {
+//       return res.status(404).json({ message: "User not found" });
+//     }
+
+//     return res.status(200).json(user);
+//   } catch (error) {
+//     console.error("Error finding user:", error);
+//     return res.status(500).json({ message: "Internal server error" });
+//   }
+// });
+
 router.post("/create", async (req, res) => {
+  // console.log("hi");
   const { email } = req.body;
 
   if (!email) {
@@ -12,30 +64,14 @@ router.post("/create", async (req, res) => {
   }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    // console.log("hi");
+    const upsertedUser = await prisma.user.upsert({
+      where: { email },
+      update: {},
+      create: {email}
+    });
 
-    if (existingUser) {
-      return res.status(200).json(existingUser);
-    }
-
-    const newUser = await prisma.user.create({ data: { email } });
-    return res.status(201).json(newUser);
-  } catch (error) {
-    console.error("Error creating user:", error);
-    return res.status(500).json({ message: "Internal server error" });
-  }
-});
-
-// GET /users/find?email=... → find user by email
-router.get("/find", async (req, res) => {
-  const { email } = req.query;
-
-  if (!email) {
-    return res.status(400).json({ message: "Missing email in query" });
-  }
-
-  try {
-    const user = await prisma.user.findUnique({
+    const fullUser = await prisma.user.findUnique({
       where: { email },
       include: {
         student: true,
@@ -44,19 +80,18 @@ router.get("/find", async (req, res) => {
       },
     });
 
-    if (!user) {
-      return res.status(404).json({ message: "User not found" });
-    }
+    // console.log(fullUser);
 
-    return res.status(200).json(user);
+    return res.status(200).json(fullUser);
   } catch (error) {
-    console.error("Error finding user:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    console.error("Error upserting user:", error);
+    return res.status(500).json({ message: "Could not create user" });
   }
 });
 
+
 // GET /users/:id → find user by ID
-router.get("/:id", async (req, res) => {
+router.get("/getid/:id", async (req, res) => {
   const { id } = req.params;
 
   if (!id) {
@@ -80,7 +115,7 @@ router.get("/:id", async (req, res) => {
     return res.status(200).json(user);
   } catch (error) {
     console.error("Error fetching user by ID:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error fetching user by ID" });
   }
 });
 

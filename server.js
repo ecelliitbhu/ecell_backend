@@ -6,6 +6,7 @@ import ambassadorRoutes from "./routes/ambassador.js";
 import postRoutes from "./routes/posts.js";
 import applicationRoutes from "./routes/applications.js";
 import userRoutes from "./routes/users.js";
+import pingRoute from "./routes/ping.js";
 
 
 
@@ -19,9 +20,10 @@ app.use("/ambassador", ambassadorRoutes);
 app.use("/posts", postRoutes);
 app.use("/applications", applicationRoutes);
 app.use("/users", userRoutes);
+app.use("/ping", pingRoute);
 
 
-const PORT = 5000;
+const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Backend running at http://localhost:${PORT}`);
 });

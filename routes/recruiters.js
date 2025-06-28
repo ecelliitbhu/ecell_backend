@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 const router = express.Router();
 
 // GET /recruiters/:id → Get recruiter by userId
-router.get("/:id", async (req, res) => {
+router.get("/getinfo/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -38,12 +38,12 @@ router.get("/:id", async (req, res) => {
     console.error("Error fetching recruiter:", error);
     return res
       .status(500)
-      .json({ message: "Internal server error", error: error.message });
+      .json({ message: "Error fetching recruiter", error: error.message });
   }
 });
 
 // PUT /recruiters/:id → Update recruiter profile
-router.put("/:id", async (req, res) => {
+router.put("/update/:id", async (req, res) => {
   const { id } = req.params;
   const { companyName, address, websiteUrl } = req.body;
 
@@ -62,12 +62,12 @@ router.put("/:id", async (req, res) => {
     console.error("Error updating recruiter:", error);
     return res
       .status(500)
-      .json({ message: "Internal server error", error: error.message });
+      .json({ message: "Error updating recruiter", error: error.message });
   }
 });
 
 // POST /recruiters → Create recruiter if not exists
-router.post("/", async (req, res) => {
+router.post("/register", async (req, res) => {
   const { userId, companyName, websiteUrl, address } = req.body;
 
   if (!userId) {
@@ -95,7 +95,7 @@ router.post("/", async (req, res) => {
     return res.status(201).json(newRecruiter);
   } catch (err) {
     console.error("Failed to create recruiter:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Failed to create recruiter" });
   }
 });
 

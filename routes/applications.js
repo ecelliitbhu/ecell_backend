@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 const router = express.Router();
 
 // GET /applications/:id → Get application by ID
-router.get("/:id", async (req, res) => {
+router.get("/getone/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -23,12 +23,12 @@ router.get("/:id", async (req, res) => {
     return res.status(200).json(application);
   } catch (error) {
     console.error("Error fetching application:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error fetching application" });
   }
 });
 
 // PUT /applications/:id → Update application status
-router.put("/:id", async (req, res) => {
+router.put("/update/:id", async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
 
@@ -41,12 +41,12 @@ router.put("/:id", async (req, res) => {
     return res.status(200).json(application);
   } catch (error) {
     console.error("Error updating application:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error updating application" });
   }
 });
 
 // DELETE /applications/:id → Withdraw (delete) application
-router.delete("/:id", async (req, res) => {
+router.delete("/delete/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -59,12 +59,12 @@ router.delete("/:id", async (req, res) => {
       .json({ message: "Application withdrawn successfully" });
   } catch (error) {
     console.error("Error deleting application:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error deleting application" });
   }
 });
 
 // GET /applications → List applications (optionally filtered by studentId or postId)
-router.get("/", async (req, res) => {
+router.get("/getinfo/", async (req, res) => {
   const { studentId, postId } = req.query;
 
   try {
@@ -103,12 +103,12 @@ router.get("/", async (req, res) => {
     return res.status(200).json(applications);
   } catch (error) {
     console.error("Error fetching applications:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error fetching applications" });
   }
 });
 
 // POST /applications → Create new application
-router.post("/", async (req, res) => {
+router.post("/create", async (req, res) => {
   const { studentId, postId } = req.body;
 
   if (!studentId || !postId) {
@@ -152,7 +152,7 @@ router.post("/", async (req, res) => {
     return res.status(201).json(application);
   } catch (error) {
     console.error("Error creating application:", error);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Error creating application" });
   }
 });
 

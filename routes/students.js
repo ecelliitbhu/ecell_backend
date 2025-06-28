@@ -4,7 +4,7 @@ import prisma from "../lib/prisma.js";
 const router = express.Router();
 
 // GET /students/:id → fetch student by ID
-router.get("/:id", async (req, res) => {
+router.get("/getinfo/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -41,7 +41,7 @@ router.get("/:id", async (req, res) => {
 });
 
 // PUT /students/:id → update student by ID
-router.put("/:id", async (req, res) => {
+router.put("/update/:id", async (req, res) => {
   const { id } = req.params;
   const {
     name,
@@ -79,7 +79,7 @@ router.put("/:id", async (req, res) => {
 });
 
 // POST /students → create new student
-router.post("/", async (req, res) => {
+router.post("/register", async (req, res) => {
   const {
     userId,
     name,
@@ -124,7 +124,7 @@ router.post("/", async (req, res) => {
     return res.status(201).json(newStudent);
   } catch (err) {
     console.error("Failed to create student:", err);
-    return res.status(500).json({ message: "Internal server error" });
+    return res.status(500).json({ message: "Failed to create student" });
   }
 });
 
