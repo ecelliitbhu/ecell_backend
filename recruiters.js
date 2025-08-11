@@ -54,6 +54,7 @@ router.put("/update/:id", async (req, res) => {
         companyName,
         address,
         websiteUrl,
+        phoneNumber,
       },
     });
 
@@ -89,6 +90,7 @@ router.post("/register", async (req, res) => {
         companyName: companyName || "", // fallback to empty string if undefined
         websiteUrl: websiteUrl || "",
         address: address || "",
+        phoneNumber: phoneNumber || "",
       },
     });
 

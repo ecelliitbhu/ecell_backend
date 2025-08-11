@@ -45,7 +45,7 @@ router.get("/getinfo/:id", async (req, res) => {
 // PUT /recruiters/:id → Update recruiter profile
 router.put("/update/:id", async (req, res) => {
   const { id } = req.params;
-  const { companyName, address, websiteUrl } = req.body;
+  const { companyName, address, websiteUrl, phoneNumber } = req.body;
 
   try {
     const recruiter = await prisma.recruiter.update({
@@ -54,6 +54,7 @@ router.put("/update/:id", async (req, res) => {
         companyName,
         address,
         websiteUrl,
+        phoneNumber,
       },
     });
 
@@ -89,6 +90,7 @@ router.post("/register", async (req, res) => {
         companyName: companyName || "", // fallback to empty string if undefined
         websiteUrl: websiteUrl || "",
         address: address || "",
+        phoneNumber: phoneNumber || "",
       },
     });
 

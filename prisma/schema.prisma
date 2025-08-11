@@ -50,6 +50,7 @@ model Recruiter {
   companyName  String
   address      String?
   websiteUrl   String?
+  phoneNumber  String?
   verified     Boolean   @default(false)
   posts        Post[]
 }
