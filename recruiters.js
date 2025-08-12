@@ -29,7 +29,7 @@ router.get("/getinfo/:id", async (req, res) => {
       return res.status(401).json({
         error: "RECRUITER_NOT_FOUND",
         message: "To access recruiter dashboard, kindly login as recruiter",
-        redirectTo: "/student-internship-portal/login",
+        redirectTo: "/grow-your-resume/login",
       });
     }
 
@@ -69,7 +69,9 @@ router.put("/update/:id", async (req, res) => {
 
 // POST /recruiters → Create recruiter if not exists
 router.post("/register", async (req, res) => {
-  const { userId, companyName, websiteUrl, address } = req.body;
+  console.log("hii");
+  const { userId, companyName, websiteUrl, address, phoneNumber } = req.body;
+  console.log("Received body:", req.body);
 
   if (!userId) {
     return res.status(400).json({ message: "Missing userId" });
@@ -97,7 +99,7 @@ router.post("/register", async (req, res) => {
     return res.status(201).json(newRecruiter);
   } catch (err) {
     console.error("Failed to create recruiter:", err);
-    return res.status(500).json({ message: "Failed to create recruiter" });
+    return res.status(500).json({ message: "Failed to create recruiter", error: err.message });
   }
 });
 
