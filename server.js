@@ -14,6 +14,7 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+app.use("/", pingRoute);
 app.use("/students", studentRoutes);
 app.use("/recruiters", recruiterRoutes);
 app.use("/ambassador", ambassadorRoutes);
@@ -27,3 +28,4 @@ const PORT = 8000;
 app.listen(PORT, () => {
   console.log(`Backend running at http://localhost:${PORT}`);
 });
+
