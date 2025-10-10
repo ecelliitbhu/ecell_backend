@@ -1,12 +1,20 @@
 {
-  "type": "module",
-  "devDependencies": {
-    "prisma": "^5.22.0"
-  },
-  "dependencies": {
-    "@prisma/client": "^5.22.0",
-    "cors": "^2.8.5",
-    "dotenv": "^16.5.0",
-    "express": "^5.1.0"
-  }
+    "name": "backend",
+    "version": "1.0.0",
+    "license": "MIT",
+    "type": "module",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js",
+        "postinstall": "prisma generate"
+    },
+    "devDependencies": {
+        "prisma": "^5.22.0"
+    },
+    "dependencies": {
+        "@prisma/client": "^5.22.0",
+        "cors": "^2.8.5",
+        "dotenv": "^17.2.3",
+        "express": "^5.1.0"
+    }
 }

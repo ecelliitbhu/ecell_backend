@@ -1,3 +1,6 @@
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import studentRoutes from "./routes/students.js";
@@ -7,8 +10,6 @@ import postRoutes from "./routes/posts.js";
 import applicationRoutes from "./routes/applications.js";
 import userRoutes from "./routes/users.js";
 import pingRoute from "./routes/ping.js";
-
-
 
 const app = express();
 app.use(cors());
@@ -23,9 +24,7 @@ app.use("/applications", applicationRoutes);
 app.use("/users", userRoutes);
 app.use("/ping", pingRoute);
 
-
-const PORT = 8000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`Backend running at http://localhost:${PORT}`);
+    console.log(`Backend running at http://localhost:${PORT}`);
 });
-
