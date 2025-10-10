@@ -250,23 +250,30 @@ router.post("/register", async (req, res) => {
   } = req.body;
 
   try {
-    // Check if the user already exists
-    const existingUser = await prisma.campusAmbassador.findUnique({
+    // Check if the ambassador already exists
+    const existingAmbassador = await prisma.campusAmbassador.findUnique({
       where: { email: email },
     });
 
-    if (existingUser) {
-      console.log("User found");
+    if (existingAmbassador) {
+      console.log("Ambassador found");
       return res
         .status(400)
         .json({
           error: "You have already submitted the form",
-          user: existingUser,
+          user: existingAmbassador,
         });
     }
 
-    // Create a new user
-    const newUser = await prisma.campusAmbassador.create({
+    // Upsert User - find existing user or create new one
+    const user = await prisma.user.upsert({
+      where: { email: email },
+      update: {}, // No updates needed if user exists
+      create: { email: email }, // Create new user if doesn't exist
+    });
+
+    // Create a new campus ambassador
+    const newAmbassador = await prisma.campusAmbassador.create({
       data: {
         name,
         collegeName,
@@ -284,9 +291,7 @@ router.post("/register", async (req, res) => {
         contribution,
         motivation,
         points: 0,
-        user: {
-          connect: { email: email },
-        },
+        userId: user.id, // Use the userId from the upserted user
       },
     });
 
@@ -296,23 +301,23 @@ router.post("/register", async (req, res) => {
     // Create a submission object for each task and connect the user
     const submissionsData = activeTasks.map((task) => ({
       taskId: task.id,
-      userEmail: newUser.email,
+      userEmail: newAmbassador.email,
       submission: "", // Initially empty, can be updated later
       status: "pending", // Default status
     }));
 
-    // Create submissions for all tasks linked to the new user
+    // Create submissions for all tasks linked to the new ambassador
     await prisma.submission.createMany({
       data: submissionsData,
     });
 
-    // Connect user to tasks
+    // Connect ambassador to tasks
     for (const task of activeTasks) {
       await prisma.task.update({
         where: { id: task.id },
         data: {
           users: {
-            connect: { id: newUser.id },
+            connect: { id: newAmbassador.id },
           },
         },
       });
@@ -322,8 +327,8 @@ router.post("/register", async (req, res) => {
       .status(201)
       .json({
         message:
-          "User successfully registered and tasks assigned with submissions!",
-        user: newUser,
+          "Ambassador successfully registered and tasks assigned with submissions!",
+        user: newAmbassador,
       });
   } catch (error) {
     console.error("Error adding user:", error);
