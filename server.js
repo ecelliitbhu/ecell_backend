@@ -24,7 +24,7 @@ app.use("/applications", applicationRoutes);
 app.use("/users", userRoutes);
 app.use("/ping", pingRoute);
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => {
     console.log(`Backend running at http://localhost:${PORT}`);
 });
