@@ -101,4 +101,39 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// PUT /recruiters/verify/:id → Approve a recruiter (SR team verification)
+router.put("/verify/:id" , async (req , res)=>{
+  const { id } = req.params;
+
+  try {
+    const recruiter = await prisma.recruiter.update({
+      where: { id },
+      data: { verified: true }
+    });
+
+    return res.status(200).json({ success:true , recruiter });
+  } catch (error) {
+    console.error("Error verifying recruiter:" , error);
+    return res.status(500)
+    .json({ success: false, message: "Verification failed", error: error.message });
+  }
+});
+
+//GET /recruiters/pending → Get all unverified recruiters
+router.get("/pending" , async (req , res)=>{
+  try {
+    const pendingRecruiters = await prisma.recruiter.findMany({
+      where : { verified: false },
+    });
+
+    return res.status(200).json(pendingRecruiters);
+  } catch (error) {
+    console.error("Error fecthing pending recruiters:" , error);
+    return res.status(500)
+    .json({ success:false , message: "Failed to fetch pending recruiters" , error: error.message });
+  }
+});
+
+
+
 export default router;

@@ -53,6 +53,8 @@ router.post("/create", async (req, res) => {
     requiredSkills,
     location,
     jobType,
+    applicationMethod, 
+    applicationLink
   } = req.body;
 
   try {
@@ -87,6 +89,8 @@ router.post("/create", async (req, res) => {
         requiredSkills,
         location,
         jobType,
+        applicationMethod,
+        applicationLink
       },
       include: {
         recruiter: true,
