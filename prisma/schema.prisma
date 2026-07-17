@@ -68,6 +68,8 @@ model Post {
   requiredSkills  String[]
   location        String?
   jobType         JobType
+  applicationMethod  String   @default("NATIVE")
+  applicationLink    String?
   createdAt       DateTime      @default(now())
   applications    Application[]
 }
