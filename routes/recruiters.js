@@ -26,7 +26,12 @@ router.get("/getinfo/:id", requireAuth, async (req, res) => {
         },
         posts: {
           include: {
-            applications: true,
+            applications: {
+              include: {
+                post: true,
+                student: true,
+              },
+            },
           },
         },
       },
