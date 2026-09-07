@@ -15,18 +15,25 @@ router.get("/getinfo/:id", requireAuth, async (req, res) => {
   }
 
   try {
+    // Flat select — every consumer of this endpoint (dashboard, profile,
+    // post-internship, post-login) only reads these fields. The old
+    // `posts: { include: { applications: true } }` pulled every post and every
+    // application row, cost 4 extra DB round trips per request, and was never
+    // rendered. Posts come from GET /posts/recruiter instead.
     const recruiter = await prisma.recruiter.findUnique({
       where: { userId: id },
-      include: {
+      select: {
+        id: true,
+        userId: true,
+        companyName: true,
+        address: true,
+        websiteUrl: true,
+        phoneNumber: true,
+        verified: true,
         user: {
           select: {
             email: true,
             createdAt: true,
-          },
-        },
-        posts: {
-          include: {
-            applications: true,
           },
         },
       },
