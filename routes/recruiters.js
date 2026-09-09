@@ -1,6 +1,6 @@
 import express from "express";
 import prisma from "../lib/prisma.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requireRole, requireAdmin } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -123,7 +123,7 @@ router.post("/register", async (req, res) => {
 });
 
 // PUT /recruiters/verify/:id → Approve a recruiter (Admin only)
-router.put("/verify/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
+router.put("/verify/:id", requireAdmin, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -132,26 +132,26 @@ router.put("/verify/:id", requireAuth, requireRole("ADMIN"), async (req, res) =>
       data: { verified: true }
     });
 
-    return res.status(200).json({ success:true , recruiter });
+    return res.status(200).json({ success: true, recruiter });
   } catch (error) {
-    console.error("Error verifying recruiter:" , error);
+    console.error("Error verifying recruiter:", error);
     return res.status(500)
-    .json({ success: false, message: "Verification failed", error: error.message });
+      .json({ success: false, message: "Verification failed", error: error.message });
   }
 });
 
 // GET /recruiters/pending → Get all unverified recruiters (Admin only)
-router.get("/pending", requireAuth, requireRole("ADMIN"), async (req, res) => {
+router.get("/pending", requireAdmin, async (req, res) => {
   try {
     const pendingRecruiters = await prisma.recruiter.findMany({
-      where : { verified: false },
+      where: { verified: false },
     });
 
     return res.status(200).json(pendingRecruiters);
   } catch (error) {
-    console.error("Error fecthing pending recruiters:" , error);
+    console.error("Error fecthing pending recruiters:", error);
     return res.status(500)
-    .json({ success:false , message: "Failed to fetch pending recruiters" , error: error.message });
+      .json({ success: false, message: "Failed to fetch pending recruiters", error: error.message });
   }
 });
 
