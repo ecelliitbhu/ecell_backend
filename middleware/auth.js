@@ -29,8 +29,29 @@ export const requireAuth = async (req, res, next) => {
 };
 
 export const requireRole = (role) => (req, res, next) => {
-  if (!req.user || !req.user.roles?.includes(role)) {
+  const roleDataKey = role.toLowerCase();
+  const hasRole =
+    req.user?.roles?.includes(role) ||
+    Boolean(req.user?.roleData?.[roleDataKey]);
+
+  if (!hasRole) {
     return res.status(403).json({ message: "Forbidden" });
   }
+  next();
+};
+
+export const requireAdmin = (req, res, next) => {
+  const username = req.headers["x-admin-username"];
+  const password = req.headers["x-admin-password"];
+
+  if (
+    !username ||
+    !password ||
+    username !== process.env.ADMIN_USERNAME ||
+    password !== process.env.ADMIN_PASSWORD
+  ) {
+    return res.status(403).json({ message: "Forbidden" });
+  }
+
   next();
 };

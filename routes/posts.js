@@ -7,58 +7,59 @@ const router = express.Router();
 // GET /posts → Public paginated feed of internships for students
 // Query params: page (default 1), limit (default 10), search, type, skills
 router.get("/", async (req, res) => {
-  const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
-  const { search, type, skills } = req.query;
-
-  // Build where clause from optional filters
-  const where = {};
-
-  if (search) {
-    where.OR = [
-      { jobTitle: { contains: search, mode: "insensitive" } },
-      { companyName: { contains: search, mode: "insensitive" } },
-    ];
-  }
-
-  if (type) {
-    where.jobType = type.toUpperCase();
-  }
-
-  if (skills) {
-    // skills can be comma-separated: ?skills=React,Node
-    const skillsArray = skills.split(",").map((s) => s.trim());
-    where.requiredSkills = { hasSome: skillsArray };
-  }
-
   try {
-    const [posts, total] = await Promise.all([
-      prisma.post.findMany({
-        skip: (page - 1) * limit,
-        take: limit,
-        where,
-        select: {
-          id: true,
-          jobTitle: true,
-          companyName: true,
-          jobType: true,
-          stipend: true,
-          location: true,
-          requiredSkills: true,
-          applicationMethod: true,
-          applicationLink: true,
-          createdAt: true,
-          // NO applications or recruiter user data included — stops over-fetching
-        },
-        orderBy: { createdAt: "desc" },
-      }),
-      prisma.post.count({ where }),
-    ]);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const { search, type, skills } = req.query;
 
-    return res.status(200).json({
-      data: posts,
-      pagination: { total, page, limit, totalPages: Math.ceil(total / limit) },
+    const where = {};
+
+    if (search) {
+      where.OR = [
+        { jobTitle: { contains: String(search), mode: "insensitive" } },
+        { companyName: { contains: String(search), mode: "insensitive" } },
+      ];
+    }
+
+    if (type) {
+      where.jobType = String(type).toUpperCase();
+    }
+
+    if (skills) {
+      const skillsArray = String(skills)
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean);
+
+      if (skillsArray.length) {
+        where.requiredSkills = { hasSome: skillsArray };
+      }
+    }
+
+    const posts = await prisma.post.findMany({
+      skip: (page - 1) * limit,
+      take: limit,
+      where,
+      select: {
+        id: true,
+        recruiterId: true,
+        companyName: true,
+        jobTitle: true,
+        jobDescription: true,
+        qualification: true,
+        experience: true,
+        jobType: true,
+        stipend: true,
+        location: true,
+        requiredSkills: true,
+        applicationMethod: true,
+        applicationLink: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
     });
+
+    return res.status(200).json(posts || []);
   } catch (error) {
     console.error("Error fetching posts:", error);
     return res.status(500).json({ message: "Error fetching posts", error: error.message });

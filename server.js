@@ -1,5 +1,11 @@
 import dotenv from "dotenv";
-dotenv.config();
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 
 import express from "express";
 import cors from "cors";
@@ -23,7 +29,7 @@ app.use("/users", userRoutes); // must stay public — /users/create is hit pre-
 
 // protected routes
 app.use("/students", requireAuth, studentRoutes);
-app.use("/recruiters", requireAuth, recruiterRoutes);
+app.use("/recruiters", recruiterRoutes);
 app.use("/ambassador", requireAuth, ambassadorRoutes);
 app.use("/applications", requireAuth, applicationRoutes);
 

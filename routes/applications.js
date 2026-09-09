@@ -50,6 +50,57 @@ router.get("/student", requireAuth, requireRole("STUDENT"), async (req, res) => 
   }
 });
 
+// GET /applications/recruiter -> applications submitted to the logged-in recruiter's posts
+router.get("/recruiter", requireAuth, async (req, res) => {
+  try {
+    // Resolve the role from the database so an older session token cannot
+    // incorrectly deny an already-registered recruiter.
+    const recruiter = await prisma.recruiter.findUnique({
+      where: { userId: req.user.id },
+      select: { id: true },
+    });
+
+    if (!recruiter) {
+      return res.status(403).json({ message: "No recruiter profile linked to this account" });
+    }
+
+    const applications = await prisma.application.findMany({
+      where: { post: { recruiterId: recruiter.id } },
+      select: {
+        id: true,
+        postId: true,
+        studentId: true,
+        status: true,
+        appliedAt: true,
+        post: {
+          select: {
+            id: true,
+            companyName: true,
+            jobTitle: true,
+          },
+        },
+        student: {
+          select: {
+            name: true,
+            rollNo: true,
+            branch: true,
+            cpi: true,
+            year: true,
+            resumeUrl: true,
+            linkedinUrl: true,
+          },
+        },
+      },
+      orderBy: { appliedAt: "desc" },
+    });
+
+    return res.status(200).json(applications);
+  } catch (error) {
+    console.error("Error fetching recruiter applications:", error);
+    return res.status(500).json({ message: "Error fetching applications" });
+  }
+});
+
 // GET /applications/post/:postId → paginated list of applicants for a specific post
 // only the recruiter who owns the post can access this
 router.get("/post/:postId", requireAuth, requireRole("RECRUITER"), async (req, res) => {

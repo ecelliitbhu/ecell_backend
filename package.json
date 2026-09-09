@@ -19,6 +19,7 @@
         "dotenv": "^17.2.3",
         "express": "^5.1.0",
         "jsonwebtoken": "^9.0.3",
-        "next-auth": "^4.24.15"
+        "next-auth": "^4.24.15",
+        "swr": "^2.5.1"
     }
 }
