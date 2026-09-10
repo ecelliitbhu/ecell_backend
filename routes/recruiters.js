@@ -1,6 +1,6 @@
 import express from "express";
 import prisma from "../lib/prisma.js";
-import { requireAuth, requireRole } from "../middleware/auth.js";
+import { requireAuth, requireRole, requireAdmin, requireAdminAccess } from "../middleware/auth.js";
 
 const router = express.Router();
 
@@ -10,8 +10,16 @@ router.get("/getinfo/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
 
   // Ownership check — the token's user ID must match the requested profile ID
+  // Admins can view any recruiter's profile
   if (req.user.id !== id) {
-    return res.status(403).json({ message: "Forbidden: you can only view your own profile" });
+    const adminUsername = req.headers["x-admin-username"];
+    const adminPassword = req.headers["x-admin-password"];
+    if (
+      adminUsername !== process.env.ADMIN_USERNAME ||
+      adminPassword !== process.env.ADMIN_PASSWORD
+    ) {
+      return res.status(403).json({ message: "Forbidden: you can only view your own profile" });
+    }
   }
 
   try {
@@ -123,7 +131,7 @@ router.post("/register", async (req, res) => {
 });
 
 // PUT /recruiters/verify/:id → Approve a recruiter (Admin only)
-router.put("/verify/:id", requireAuth, requireRole("ADMIN"), async (req, res) => {
+router.put("/verify/:id", requireAdminAccess, async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -141,10 +149,18 @@ router.put("/verify/:id", requireAuth, requireRole("ADMIN"), async (req, res) =>
 });
 
 // GET /recruiters/pending → Get all unverified recruiters (Admin only)
-router.get("/pending", requireAuth, requireRole("ADMIN"), async (req, res) => {
+router.get("/pending", requireAdminAccess, async (req, res) => {
   try {
     const pendingRecruiters = await prisma.recruiter.findMany({
       where : { verified: false },
+      include: {
+        user: {
+          select: {
+            email: true,
+            createdAt: true,
+          },
+        },
+      },
     });
 
     return res.status(200).json(pendingRecruiters);
