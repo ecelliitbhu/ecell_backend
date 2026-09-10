@@ -130,6 +130,42 @@ router.post("/register", async (req, res) => {
   }
 });
 
+// GET /recruiters/pending -> Get unverified recruiters
+router.get("/pending", async (req, res) => {
+  try {
+    const pending = await prisma.recruiter.findMany({
+      where: { verified: false },
+      include: {
+        user: {
+          select: {
+            email: true,
+            createdAt: true,
+          },
+        },
+      },
+    });
+    return res.status(200).json(pending);
+  } catch (error) {
+    console.error("Error fetching pending recruiters:", error);
+    return res.status(500).json({ message: "Error fetching pending recruiters", error: error.message });
+  }
+});
+
+// PUT /recruiters/verify/:id -> Verify a recruiter
+router.put("/verify/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const recruiter = await prisma.recruiter.update({
+      where: { id },
+      data: { verified: true },
+    });
+    return res.status(200).json(recruiter);
+  } catch (error) {
+    console.error("Error verifying recruiter:", error);
+    return res.status(500).json({ message: "Error verifying recruiter", error: error.message });
+  }
+});
+
 // PUT /recruiters/verify/:id → Approve a recruiter (Admin only)
 router.put("/verify/:id", requireAdminAccess, async (req, res) => {
   const { id } = req.params;
