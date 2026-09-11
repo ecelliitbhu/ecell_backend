@@ -4,17 +4,61 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// GET /applications/recruiter → all applications across the logged-in recruiter's posts
+router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res) => {
+  try {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (!recruiter) {
+      return res.status(403).json({ message: "No recruiter profile linked to this account" });
+    }
+
+    const applications = await prisma.application.findMany({
+      where: { post: { recruiterId: recruiter.id } },
+      orderBy: { appliedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        appliedAt: true,
+        post: {
+          select: {
+            id: true,
+            jobTitle: true,
+            companyName: true,
+          },
+        },
+        student: {
+          select: {
+            name: true,
+            rollNo: true,
+            branch: true,
+            cpi: true,
+            year: true,
+            resumeUrl: true,
+            linkedinUrl: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json(applications);
+  } catch (error) {
+    console.error("Error fetching recruiter applications:", error);
+    return res.status(500).json({ message: "Error fetching recruiter applications" });
+  }
+});
+
 // GET /applications/student → paginated list of the logged-in student's own applications
 router.get("/student", requireAuth, requireRole("STUDENT"), async (req, res) => {
   const studentId = req.user.id;
-  if (!req.user.roleData?.student) {
-    return res.status(403).json({ message: "No student profile linked to this account" });
-  }
-
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
 
   try {
+    const student = await prisma.student.findUnique({ where: { userId: studentId } });
+    if (!student) {
+      return res.status(403).json({ message: "No student profile linked to this account" });
+    }
+
     const [applications, total] = await Promise.all([
       prisma.application.findMany({
         where: { studentId },
@@ -54,12 +98,17 @@ router.get("/student", requireAuth, requireRole("STUDENT"), async (req, res) => 
 // only the recruiter who owns the post can access this
 router.get("/post/:postId", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { postId } = req.params;
-  const recruiterId = req.user.roleData?.recruiter?.id;
 
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
 
   try {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (!recruiter) {
+      return res.status(403).json({ message: "No recruiter profile linked to this account" });
+    }
+    const recruiterId = recruiter.id;
+
     const post = await prisma.post.findUnique({ where: { id: postId } });
 
     if (!post) {
@@ -82,6 +131,13 @@ router.get("/post/:postId", requireAuth, requireRole("RECRUITER"), async (req, r
           id: true,
           status: true,
           appliedAt: true,
+          post: {
+            select: {
+              id: true,
+              jobTitle: true,
+              companyName: true,
+            },
+          },
           student: {
             select: {
               name: true,
@@ -127,7 +183,11 @@ router.get("/getone/:id", requireAuth, async (req, res) => {
     }
 
     const isOwnerStudent = req.user.roles?.includes("STUDENT") && application.student.userId === req.user.id;
-    const isOwnerRecruiter = req.user.roles?.includes("RECRUITER") && application.post.recruiterId === req.user.roleData?.recruiter?.id;
+    let isOwnerRecruiter = false;
+    if (req.user.roles?.includes("RECRUITER")) {
+      const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+      isOwnerRecruiter = recruiter && application.post.recruiterId === recruiter.id;
+    }
 
     if (!isOwnerStudent && !isOwnerRecruiter) {
       return res.status(403).json({ message: "Forbidden" });
@@ -144,7 +204,6 @@ router.get("/getone/:id", requireAuth, async (req, res) => {
 router.put("/update/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  const recruiterId = req.user.roleData?.recruiter?.id;
 
   const allowedStatuses = ["PENDING", "ACCEPTED", "REJECTED"];
   if (!allowedStatuses.includes(status)) {
@@ -152,6 +211,12 @@ router.put("/update/:id", requireAuth, requireRole("RECRUITER"), async (req, res
   }
 
   try {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (!recruiter) {
+      return res.status(403).json({ message: "No recruiter profile linked to this account" });
+    }
+    const recruiterId = recruiter.id;
+
     const application = await prisma.application.findUnique({
       where: { id },
       include: { post: true },
@@ -215,11 +280,13 @@ router.post("/create", requireAuth, requireRole("STUDENT"), async (req, res) => 
   if (!postId) {
     return res.status(400).json({ message: "Missing postId" });
   }
-  if (!req.user.roleData?.student) {
-    return res.status(403).json({ message: "No student profile linked to this account" });
-  }
 
   try {
+    const student = await prisma.student.findUnique({ where: { userId: studentId } });
+    if (!student) {
+      return res.status(403).json({ message: "No student profile linked to this account" });
+    }
+
     const application = await prisma.application.create({
       data: {
         studentId,
