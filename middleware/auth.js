@@ -22,6 +22,24 @@ export const requireAuth = async (req, res, next) => {
     }
 
     req.user = decoded;
+
+    // Enrich with fresh roleData from DB — the JWT bakes roleData at login
+    // time and never refreshes, so recruiter/student profiles created after
+    // login are invisible to roleData-dependent routes.
+    try {
+      const freshUser = await prisma.user.findUnique({
+        where: { id: decoded.id },
+        select: { student: true, recruiter: true, ambassador: true },
+      });
+      req.user.roleData = {
+        student: freshUser?.student || null,
+        recruiter: freshUser?.recruiter || null,
+        ambassador: freshUser?.ambassador || null,
+      };
+    } catch (e) {
+      console.error("roleData enrichment failed:", e.message);
+    }
+
     next();
   } catch (error) {
     console.error("Auth middleware error:", error.message);
