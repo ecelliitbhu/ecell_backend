@@ -4,6 +4,50 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
+// GET /applications/recruiter → all applications across the logged-in recruiter's posts
+router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res) => {
+  const recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    return res.status(403).json({ message: "No recruiter profile linked to this account" });
+  }
+
+  try {
+    const applications = await prisma.application.findMany({
+      where: { post: { recruiterId } },
+      orderBy: { appliedAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        appliedAt: true,
+        post: {
+          select: {
+            id: true,
+            jobTitle: true,
+            companyName: true,
+          },
+        },
+        student: {
+          select: {
+            name: true,
+            rollNo: true,
+            branch: true,
+            cpi: true,
+            year: true,
+            resumeUrl: true,
+            linkedinUrl: true,
+          },
+        },
+      },
+    });
+
+    return res.status(200).json(applications);
+  } catch (error) {
+    console.error("Error fetching recruiter applications:", error);
+    return res.status(500).json({ message: "Error fetching recruiter applications" });
+  }
+});
+
 // GET /applications/student → paginated list of the logged-in student's own applications
 router.get("/student", requireAuth, requireRole("STUDENT"), async (req, res) => {
   const studentId = req.user.id;
