@@ -68,16 +68,16 @@ router.get("/", async (req, res) => {
 // GET /posts/recruiter → Recruiter's own posts (paginated dashboard feed)
 // Auth required. Only returns posts belonging to the logged-in recruiter.
 router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res) => {
+  const recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    return res.status(403).json({ message: "No recruiter profile linked to this account" });
+  }
+
   const page = parseInt(req.query.page) || 1;
   const limit = parseInt(req.query.limit) || 10;
 
   try {
-    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
-    if (!recruiter) {
-      return res.status(403).json({ message: "No recruiter profile linked to this account" });
-    }
-    const recruiterId = recruiter.id;
-
     const [posts, total] = await Promise.all([
       prisma.post.findMany({
         where: { recruiterId },
@@ -157,6 +157,12 @@ router.get("/:id", async (req, res) => {
 // POST /posts → Create a new post
 // Auth required. recruiterId comes from req.user — NOT from req.body (security fix)
 router.post("/", requireAuth, requireRole("RECRUITER"), async (req, res) => {
+  const recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    return res.status(403).json({ message: "No recruiter profile linked to this account" });
+  }
+
   const {
     companyName,
     jobTitle,
@@ -172,18 +178,16 @@ router.post("/", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   } = req.body;
 
   try {
-    // Verify the recruiter exists and is verified before allowing post creation
-    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    // Verify the recruiter is verified before allowing post creation
+    const recruiter = await prisma.recruiter.findUnique({ where: { id: recruiterId } });
 
     if (!recruiter) {
-      return res.status(403).json({ message: "No recruiter profile linked to this account" });
+      return res.status(400).json({ message: "Recruiter profile not found" });
     }
 
     if (!recruiter.verified) {
       return res.status(403).json({ message: "Recruiter not verified. Cannot create post." });
     }
-
-    const recruiterId = recruiter.id;
 
     const post = await prisma.post.create({
       data: {
@@ -220,6 +224,11 @@ router.post("/", requireAuth, requireRole("RECRUITER"), async (req, res) => {
 // Auth required. Only the recruiter who owns the post can update it.
 router.put("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
+  const recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    return res.status(403).json({ message: "No recruiter profile linked to this account" });
+  }
 
   const {
     companyName,
@@ -236,12 +245,6 @@ router.put("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   } = req.body;
 
   try {
-    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
-    if (!recruiter) {
-      return res.status(403).json({ message: "No recruiter profile linked to this account" });
-    }
-    const recruiterId = recruiter.id;
-
     // Ownership check — must own the post before updating
     const post = await prisma.post.findUnique({ where: { id } });
 
@@ -281,14 +284,13 @@ router.put("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
 // Auth required. Only the recruiter who owns the post can delete it.
 router.delete("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
+  const recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    return res.status(403).json({ message: "No recruiter profile linked to this account" });
+  }
 
   try {
-    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
-    if (!recruiter) {
-      return res.status(403).json({ message: "No recruiter profile linked to this account" });
-    }
-    const recruiterId = recruiter.id;
-
     // Ownership check — must own the post before deleting
     const post = await prisma.post.findUnique({ where: { id } });
 
