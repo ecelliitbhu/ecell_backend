@@ -85,6 +85,7 @@ router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res)
         take: limit,
         select: {
           id: true,
+          recruiterId: true,
           jobTitle: true,
           companyName: true,
           jobType: true,
