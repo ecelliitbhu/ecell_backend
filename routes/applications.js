@@ -128,6 +128,13 @@ router.get("/post/:postId", requireAuth, requireRole("RECRUITER"), async (req, r
           id: true,
           status: true,
           appliedAt: true,
+          post: {
+            select: {
+              id: true,
+              jobTitle: true,
+              companyName: true,
+            },
+          },
           student: {
             select: {
               name: true,
