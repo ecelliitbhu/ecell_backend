@@ -1,11 +1,19 @@
 import express from "express";
 import prisma from "../lib/prisma.js";
+import { requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// GET /students/:id → fetch student by ID
+// GET /students/getinfo/:id → fetch student by userId
+// Ownership check: you can only fetch your own profile
 router.get("/getinfo/:id", async (req, res) => {
   const { id } = req.params;
+
+  // Ownership check — the token's user ID or student ID must match the requested profile ID
+  const isOwner = req.user.id === id || req.user.roleData?.student?.id === id || req.user.roles?.includes("ADMIN");
+  if (!isOwner) {
+    return res.status(403).json({ message: "Forbidden: you can only view your own profile" });
+  }
 
   try {
     const student = await prisma.student.findFirst({
@@ -44,9 +52,16 @@ router.get("/getinfo/:id", async (req, res) => {
   }
 });
 
-// PUT /students/:id → update student by ID
-router.put("/update/:id", async (req, res) => {
+// PUT /students/update/:id → update student by userId
+// Ownership check: you can only update your own profile
+router.put("/update/:id", requireRole("STUDENT"), async (req, res) => {
   const { id } = req.params;
+
+  // Ownership check
+  const isOwner = req.user.id === id || req.user.roleData?.student?.id === id || req.user.roles?.includes("ADMIN");
+  if (!isOwner) {
+    return res.status(403).json({ message: "Forbidden: you can only update your own profile" });
+  }
   const {
     name,
     rollNo,
