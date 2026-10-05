@@ -26,10 +26,9 @@ router.get("/getinfo/:id", async (req, res) => {
     });
 
     if (!student) {
-      return res.status(401).json({
+      return res.status(404).json({
         error: "STUDENT_NOT_FOUND",
-        message: "To access student dashboard, kindly login as student",
-        redirectTo: "/student-internship-portal/login",
+        message: "Student profile not found",
       });
     }
 
@@ -56,18 +55,24 @@ router.put("/update/:id", async (req, res) => {
   } = req.body;
 
   try {
-    const updated = await prisma.student.update({
+    const data = {
+      name,
+      rollNo,
+      branch,
+      cpi: typeof cpi === "number" ? cpi : (Number.parseFloat(cpi) || 0),
+      courseType: courseType || "B.Tech",
+      year: typeof year === "number" ? year : (Number.parseInt(year) || 1),
+      linkedinUrl: linkedinUrl || "",
+      githubUrl: githubUrl || "",
+      resumeUrl: resumeUrl || "",
+    };
+
+    const updated = await prisma.student.upsert({
       where: { userId: id },
-      data: {
-        name,
-        rollNo,
-        branch,
-        cpi,
-        courseType,
-        year,
-        linkedinUrl,
-        githubUrl,
-        resumeUrl,
+      update: data,
+      create: {
+        userId: id,
+        ...data,
       },
     });
 
@@ -98,30 +103,28 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const existing = await prisma.student.findUnique({
+    const data = {
+      name: name || "",
+      rollNo: rollNo || "",
+      branch: branch || "Architecture, Planning and Design",
+      cpi: typeof cpi === "number" ? cpi : (Number.parseFloat(cpi) || 0),
+      courseType: courseType || "B.Tech",
+      year: typeof year === "number" ? year : (Number.parseInt(year) || 1),
+      linkedinUrl: linkedinUrl || "",
+      githubUrl: githubUrl || "",
+      resumeUrl: resumeUrl || "",
+    };
+
+    const savedStudent = await prisma.student.upsert({
       where: { userId },
-    });
-
-    if (existing) {
-      return res.status(200).json(existing);
-    }
-
-    const newStudent = await prisma.student.create({
-      data: {
+      update: data,
+      create: {
         userId,
-        name,
-        rollNo,
-        branch,
-        cpi,
-        courseType,
-        year,
-        linkedinUrl,
-        githubUrl,
-        resumeUrl,
+        ...data,
       },
     });
 
-    return res.status(201).json(newStudent);
+    return res.status(200).json(savedStudent);
   } catch (err) {
     console.error("Failed to create student:", err);
     return res.status(500).json({ message: "Failed to create student" });

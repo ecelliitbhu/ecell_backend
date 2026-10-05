@@ -26,10 +26,9 @@ router.get("/getinfo/:id", async (req, res) => {
     });
 
     if (!recruiter) {
-      return res.status(401).json({
+      return res.status(404).json({
         error: "RECRUITER_NOT_FOUND",
-        message: "To access recruiter dashboard, kindly login as recruiter",
-        redirectTo: "/grow-your-resume/login",
+        message: "Recruiter profile not found",
       });
     }
 
@@ -48,13 +47,19 @@ router.put("/update/:id", async (req, res) => {
   const { companyName, address, websiteUrl, phoneNumber } = req.body;
 
   try {
-    const recruiter = await prisma.recruiter.update({
+    const data = {
+      companyName: companyName || "",
+      address: address || "",
+      websiteUrl: websiteUrl || "",
+      phoneNumber: phoneNumber || "",
+    };
+
+    const recruiter = await prisma.recruiter.upsert({
       where: { userId: id },
-      data: {
-        companyName,
-        address,
-        websiteUrl,
-        phoneNumber,
+      update: data,
+      create: {
+        userId: id,
+        ...data,
       },
     });
 
@@ -76,25 +81,23 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const existing = await prisma.recruiter.findUnique({
+    const data = {
+      companyName: companyName || "",
+      websiteUrl: websiteUrl || "",
+      address: address || "",
+      phoneNumber: phoneNumber || "",
+    };
+
+    const savedRecruiter = await prisma.recruiter.upsert({
       where: { userId },
-    });
-
-    if (existing) {
-      return res.status(200).json(existing);
-    }
-
-    const newRecruiter = await prisma.recruiter.create({
-      data: {
+      update: data,
+      create: {
         userId,
-        companyName: companyName || "", // fallback to empty string if undefined
-        websiteUrl: websiteUrl || "",
-        address: address || "",
-        phoneNumber: phoneNumber || "",
+        ...data,
       },
     });
 
-    return res.status(201).json(newRecruiter);
+    return res.status(200).json(savedRecruiter);
   } catch (err) {
     console.error("Failed to create recruiter:", err);
     return res.status(500).json({ message: "Failed to create recruiter" });
