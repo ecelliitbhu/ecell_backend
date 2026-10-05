@@ -3,8 +3,8 @@ import prisma from "../lib/prisma.js";
 
 const router = express.Router();
 
-// GET /posts → Get all posts
-router.get("/getinfo", async (req, res) => {
+// GET /posts or /posts/getinfo → Get all posts
+router.get(["/", "/getinfo"], async (req, res) => {
   try {
     console.log("Fetching all posts...");
 
@@ -40,8 +40,8 @@ router.get("/getinfo", async (req, res) => {
   }
 });
 
-// POST /posts → Create a new post
-router.post("/create", async (req, res) => {
+// POST /posts or /posts/create → Create a new post
+router.post(["/", "/create"], async (req, res) => {
   const {
     recruiterId,
     companyName,
@@ -104,8 +104,8 @@ router.post("/create", async (req, res) => {
   }
 });
 
-// GET /posts/:id → Get a single post
-router.get("/getpost/:id", async (req, res) => {
+// GET /posts/:id or /posts/getpost/:id → Get a single post
+router.get(["/:id", "/getpost/:id"], async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -132,8 +132,8 @@ router.get("/getpost/:id", async (req, res) => {
   }
 });
 
-// PUT /posts/:id → Update a post
-router.put("/update/:id", async (req, res) => {
+// PUT /posts/:id or /posts/update/:id → Update a post
+router.put(["/:id", "/update/:id"], async (req, res) => {
   const { id } = req.params;
   const {
     companyName,
@@ -170,8 +170,8 @@ router.put("/update/:id", async (req, res) => {
   }
 });
 
-// DELETE /posts/:id → Delete a post and its applications
-router.delete("/delete/:id", async (req, res) => {
+// DELETE /posts/:id or /posts/delete/:id → Delete a post and its applications
+router.delete(["/:id", "/delete/:id"], async (req, res) => {
   const { id } = req.params;
 
   try {

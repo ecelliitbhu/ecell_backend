@@ -45,19 +45,25 @@ router.put("/update/:id", async (req, res) => {
   }
 });
 
-// DELETE /applications/:id → Withdraw (delete) application
-router.delete("/delete/:id", async (req, res) => {
+// DELETE /applications/:id or /applications/delete/:id → Withdraw (delete) application
+router.delete(["/:id", "/delete/:id"], async (req, res) => {
   const { id } = req.params;
 
   try {
-    const application = await prisma.application.findUnique({
-      where: { id },
+    const application = await prisma.application.findFirst({
+      where: {
+        OR: [
+          { id },
+          { postId: id },
+        ],
+      },
     });
 
     if (!application) {
-      return res.status(404).json({ message: "Application not found" });
+      // Idempotent: already withdrawn/deleted
+      return res.status(200).json({ message: "Application already withdrawn" });
     }
-    // console.log("Status of application:", application.status);
+
     const status = application.status?.toLowerCase?.();
     if (status === "rejected") {
       return res
@@ -66,7 +72,7 @@ router.delete("/delete/:id", async (req, res) => {
     }
 
     await prisma.application.delete({
-      where: { id },
+      where: { id: application.id },
     });
 
     return res
@@ -79,12 +85,17 @@ router.delete("/delete/:id", async (req, res) => {
 });
 
 // GET /applications → List applications (optionally filtered by studentId or postId)
-router.get("/getinfo/", async (req, res) => {
+router.get(["/", "/getinfo", "/getinfo/", "/student"], async (req, res) => {
   const { studentId, postId } = req.query;
 
   try {
     const where = {};
-    if (studentId) where.studentId = studentId;
+    if (studentId) {
+      const student = await prisma.student.findFirst({
+        where: { OR: [{ userId: studentId }, { id: studentId }] },
+      });
+      where.studentId = student ? student.userId : studentId;
+    }
     if (postId) where.postId = postId;
 
     const applications = await prisma.application.findMany({
@@ -123,7 +134,7 @@ router.get("/getinfo/", async (req, res) => {
 });
 
 // POST /applications → Create new application
-router.post("/create", async (req, res) => {
+router.post(["/", "/create"], async (req, res) => {
   const { studentId, postId } = req.body;
 
   if (!studentId || !postId) {
@@ -131,22 +142,35 @@ router.post("/create", async (req, res) => {
   }
 
   try {
+    let actualStudentId = studentId;
+    const student = await prisma.student.findFirst({
+      where: { OR: [{ userId: studentId }, { id: studentId }] },
+    });
+    if (student) {
+      actualStudentId = student.userId;
+    }
+
     const existingApplication = await prisma.application.findFirst({
       where: {
-        studentId,
+        studentId: actualStudentId,
         postId,
+      },
+      include: {
+        post: true,
       },
     });
 
     if (existingApplication) {
-      return res
-        .status(400)
-        .json({ message: "You have already applied for this position" });
+      return res.status(200).json({
+        message: "You have already applied for this position",
+        alreadyApplied: true,
+        ...existingApplication,
+      });
     }
 
     const application = await prisma.application.create({
       data: {
-        studentId,
+        studentId: actualStudentId,
         postId,
         status: "PENDING",
       },
@@ -166,6 +190,17 @@ router.post("/create", async (req, res) => {
 
     return res.status(201).json(application);
   } catch (error) {
+    if (error.code === "P2002") {
+      const existing = await prisma.application.findFirst({
+        where: { postId },
+        include: { post: true },
+      });
+      return res.status(200).json({
+        message: "You have already applied for this position",
+        alreadyApplied: true,
+        ...(existing || {}),
+      });
+    }
     console.error("Error creating application:", error);
     return res.status(500).json({ message: "Error creating application" });
   }

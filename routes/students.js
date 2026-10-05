@@ -8,8 +8,13 @@ router.get("/getinfo/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const student = await prisma.student.findUnique({
-      where: { userId: id },
+    const student = await prisma.student.findFirst({
+      where: {
+        OR: [
+          { userId: id },
+          { id: id }
+        ]
+      },
       include: {
         user: {
           select: {

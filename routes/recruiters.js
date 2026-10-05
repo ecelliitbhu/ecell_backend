@@ -8,8 +8,13 @@ router.get("/getinfo/:id", async (req, res) => {
   const { id } = req.params;
 
   try {
-    const recruiter = await prisma.recruiter.findUnique({
-      where: { userId: id },
+    const recruiter = await prisma.recruiter.findFirst({
+      where: {
+        OR: [
+          { userId: id },
+          { id: id }
+        ]
+      },
       include: {
         user: {
           select: {
