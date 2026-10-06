@@ -6,7 +6,12 @@ const router = express.Router();
 
 // GET /applications/recruiter → all applications across the logged-in recruiter's posts
 router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res) => {
-  const recruiterId = req.user.roleData?.recruiter?.id;
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) recruiterId = recruiter.id;
+  }
 
   if (!recruiterId) {
     return res.status(403).json({ message: "No recruiter profile linked to this account" });
@@ -54,11 +59,14 @@ router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res)
 router.get("/student", requireAuth, requireRole("STUDENT"), async (req, res) => {
   const studentId = req.user.id;
   if (!req.user.roleData?.student) {
-    return res.status(403).json({ message: "No student profile linked to this account" });
+    const student = await prisma.student.findUnique({ where: { userId: req.user.id } });
+    if (!student) {
+      return res.status(403).json({ message: "No student profile linked to this account" });
+    }
   }
 
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit) || 20;
 
   try {
     const [applications, total] = await Promise.all([
@@ -100,10 +108,15 @@ router.get("/student", requireAuth, requireRole("STUDENT"), async (req, res) => 
 // only the recruiter who owns the post can access this
 router.get("/post/:postId", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { postId } = req.params;
-  const recruiterId = req.user.roleData?.recruiter?.id;
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) recruiterId = recruiter.id;
+  }
 
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit) || 20;
 
   try {
     const post = await prisma.post.findUnique({ where: { id: postId } });
@@ -180,9 +193,11 @@ router.get("/getone/:id", requireAuth, async (req, res) => {
     }
 
     const isOwnerStudent = req.user.roles?.includes("STUDENT") && application.student.userId === req.user.id;
-    const isOwnerRecruiter = req.user.roles?.includes("RECRUITER") && application.post.recruiterId === req.user.roleData?.recruiter?.id;
+    const recruiterId = req.user.roleData?.recruiter?.id;
+    const isOwnerRecruiter = req.user.roles?.includes("RECRUITER") && application.post.recruiterId === recruiterId;
+    const isAdmin = req.user.roles?.includes("ADMIN");
 
-    if (!isOwnerStudent && !isOwnerRecruiter) {
+    if (!isOwnerStudent && !isOwnerRecruiter && !isAdmin) {
       return res.status(403).json({ message: "Forbidden" });
     }
 
@@ -197,7 +212,12 @@ router.get("/getone/:id", requireAuth, async (req, res) => {
 router.put("/update/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
   const { status } = req.body;
-  const recruiterId = req.user.roleData?.recruiter?.id;
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) recruiterId = recruiter.id;
+  }
 
   const allowedStatuses = ["PENDING", "ACCEPTED", "REJECTED"];
   if (!allowedStatuses.includes(status)) {
@@ -230,20 +250,33 @@ router.put("/update/:id", requireAuth, requireRole("RECRUITER"), async (req, res
   }
 });
 
-// DELETE /applications/delete/:id → student withdraws their own application
-router.delete("/delete/:id", requireAuth, requireRole("STUDENT"), async (req, res) => {
+// DELETE /applications/:id or /applications/delete/:id → Withdraw (delete) application
+router.delete(["/delete/:id", "/:id"], requireAuth, async (req, res) => {
   const { id } = req.params;
-  const studentId = req.user.id;
+  const currentUserId = req.user?.id;
 
   try {
-    const application = await prisma.application.findUnique({ where: { id } });
+    const application = await prisma.application.findFirst({
+      where: {
+        OR: [
+          { id },
+          { postId: id, studentId: currentUserId },
+          { postId: id },
+        ],
+      },
+      include: {
+        student: true,
+      },
+    });
 
     if (!application) {
-      return res.status(404).json({ message: "Application not found" });
+      // Idempotent: already withdrawn/deleted
+      return res.status(200).json({ message: "Application already withdrawn", alreadyWithdrawn: true });
     }
 
-    if (application.studentId !== studentId) {
-      return res.status(403).json({ message: "Forbidden" });
+    const isOwner = application.studentId === currentUserId || application.student?.userId === currentUserId || req.user?.roles?.includes("ADMIN");
+    if (!isOwner && req.user?.roles?.includes("STUDENT")) {
+      return res.status(403).json({ message: "Forbidden: you can only withdraw your own application" });
     }
 
     const status = application.status?.toLowerCase?.();
@@ -251,31 +284,111 @@ router.delete("/delete/:id", requireAuth, requireRole("STUDENT"), async (req, re
       return res.status(400).json({ message: "Cannot withdraw a rejected application" });
     }
 
-    await prisma.application.delete({ where: { id } });
+    await prisma.application.delete({
+      where: { id: application.id },
+    });
 
-    return res.status(200).json({ message: "Application withdrawn successfully" });
+    return res.status(200).json({ message: "Application withdrawn successfully", success: true });
   } catch (error) {
     console.error("Error deleting application:", error);
-    return res.status(500).json({ message: "Error deleting application" });
+    return res.status(500).json({ message: "Error deleting application", error: error.message });
   }
 });
 
-// POST /applications/create → student applies to a post
-router.post("/create", requireAuth, requireRole("STUDENT"), async (req, res) => {
+// GET /applications or /applications/getinfo → List applications (optionally filtered by studentId or postId)
+router.get(["/", "/getinfo", "/getinfo/"], requireAuth, async (req, res) => {
+  const { studentId, postId } = req.query;
+
+  try {
+    const where = {};
+    if (studentId) {
+      const student = await prisma.student.findFirst({
+        where: { OR: [{ userId: studentId }, { id: studentId }] },
+      });
+      where.studentId = student ? student.userId : studentId;
+    }
+    if (postId) {
+      where.postId = postId;
+    }
+
+    const applications = await prisma.application.findMany({
+      where,
+      include: {
+        student: {
+          include: {
+            user: {
+              select: {
+                email: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
+        post: {
+          include: {
+            recruiter: {
+              include: {
+                user: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        appliedAt: "desc",
+      },
+    });
+
+    return res.status(200).json(applications);
+  } catch (error) {
+    console.error("Error fetching applications:", error);
+    return res.status(500).json({ message: "Error fetching applications", error: error.message });
+  }
+});
+
+// POST /applications or /applications/create → Create new application
+router.post(["/", "/create"], requireAuth, async (req, res) => {
   const { postId } = req.body;
-  const studentId = req.user.id;
+  let studentId = req.body.studentId || req.user?.id;
 
   if (!postId) {
     return res.status(400).json({ message: "Missing postId" });
   }
-  if (!req.user.roleData?.student) {
-    return res.status(403).json({ message: "No student profile linked to this account" });
+
+  if (!studentId && req.user?.id) {
+    studentId = req.user.id;
   }
 
   try {
+    let actualStudentId = studentId;
+    const student = await prisma.student.findFirst({
+      where: { OR: [{ userId: studentId }, { id: studentId }] },
+    });
+    if (student) {
+      actualStudentId = student.userId;
+    }
+
+    const existingApplication = await prisma.application.findFirst({
+      where: {
+        studentId: actualStudentId,
+        postId,
+      },
+      include: {
+        post: true,
+      },
+    });
+
+    if (existingApplication) {
+      return res.status(200).json({
+        message: "You have already applied for this position",
+        alreadyApplied: true,
+        ...existingApplication,
+      });
+    }
+
     const application = await prisma.application.create({
       data: {
-        studentId,
+        studentId: actualStudentId,
         postId,
         status: "PENDING",
       },
@@ -290,10 +403,18 @@ router.post("/create", requireAuth, requireRole("STUDENT"), async (req, res) => 
     return res.status(201).json(application);
   } catch (error) {
     if (error.code === "P2002") {
-      return res.status(409).json({ message: "You have already applied for this position" });
+      const existing = await prisma.application.findFirst({
+        where: { postId, studentId: req.user?.id || studentId },
+        include: { post: true },
+      });
+      return res.status(200).json({
+        message: "You have already applied for this position",
+        alreadyApplied: true,
+        ...(existing || {}),
+      });
     }
     console.error("Error creating application:", error);
-    return res.status(500).json({ message: "Error creating application" });
+    return res.status(500).json({ message: "Error creating application", error: error.message });
   }
 });
 

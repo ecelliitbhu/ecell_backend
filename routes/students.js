@@ -9,14 +9,20 @@ const router = express.Router();
 router.get("/getinfo/:id", async (req, res) => {
   const { id } = req.params;
 
-  // Ownership check — the token's user ID must match the requested profile ID
-  if (req.user.id !== id) {
+  // Ownership check — the token's user ID or student ID must match the requested profile ID
+  const isOwner = req.user.id === id || req.user.roleData?.student?.id === id || req.user.roles?.includes("ADMIN");
+  if (!isOwner) {
     return res.status(403).json({ message: "Forbidden: you can only view your own profile" });
   }
 
   try {
-    const student = await prisma.student.findUnique({
-      where: { userId: id },
+    const student = await prisma.student.findFirst({
+      where: {
+        OR: [
+          { userId: id },
+          { id: id }
+        ]
+      },
       include: {
         user: {
           select: {
@@ -35,8 +41,7 @@ router.get("/getinfo/:id", async (req, res) => {
     if (!student) {
       return res.status(404).json({
         error: "STUDENT_NOT_FOUND",
-        message: "To access student dashboard, kindly login as student",
-        redirectTo: "/student-internship-portal/login",
+        message: "Student profile not found",
       });
     }
 
@@ -53,7 +58,8 @@ router.put("/update/:id", requireRole("STUDENT"), async (req, res) => {
   const { id } = req.params;
 
   // Ownership check
-  if (req.user.id !== id) {
+  const isOwner = req.user.id === id || req.user.roleData?.student?.id === id || req.user.roles?.includes("ADMIN");
+  if (!isOwner) {
     return res.status(403).json({ message: "Forbidden: you can only update your own profile" });
   }
   const {
@@ -69,18 +75,24 @@ router.put("/update/:id", requireRole("STUDENT"), async (req, res) => {
   } = req.body;
 
   try {
-    const updated = await prisma.student.update({
+    const data = {
+      name,
+      rollNo,
+      branch,
+      cpi: typeof cpi === "number" ? cpi : (Number.parseFloat(cpi) || 0),
+      courseType: courseType || "B.Tech",
+      year: typeof year === "number" ? year : (Number.parseInt(year) || 1),
+      linkedinUrl: linkedinUrl || "",
+      githubUrl: githubUrl || "",
+      resumeUrl: resumeUrl || "",
+    };
+
+    const updated = await prisma.student.upsert({
       where: { userId: id },
-      data: {
-        name,
-        rollNo,
-        branch,
-        cpi,
-        courseType,
-        year,
-        linkedinUrl,
-        githubUrl,
-        resumeUrl,
+      update: data,
+      create: {
+        userId: id,
+        ...data,
       },
     });
 
@@ -111,30 +123,28 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const existing = await prisma.student.findUnique({
+    const data = {
+      name: name || "",
+      rollNo: rollNo || "",
+      branch: branch || "Architecture, Planning and Design",
+      cpi: typeof cpi === "number" ? cpi : (Number.parseFloat(cpi) || 0),
+      courseType: courseType || "B.Tech",
+      year: typeof year === "number" ? year : (Number.parseInt(year) || 1),
+      linkedinUrl: linkedinUrl || "",
+      githubUrl: githubUrl || "",
+      resumeUrl: resumeUrl || "",
+    };
+
+    const savedStudent = await prisma.student.upsert({
       where: { userId },
-    });
-
-    if (existing) {
-      return res.status(200).json(existing);
-    }
-
-    const newStudent = await prisma.student.create({
-      data: {
+      update: data,
+      create: {
         userId,
-        name,
-        rollNo,
-        branch,
-        cpi,
-        courseType,
-        year,
-        linkedinUrl,
-        githubUrl,
-        resumeUrl,
+        ...data,
       },
     });
 
-    return res.status(201).json(newStudent);
+    return res.status(200).json(savedStudent);
   } catch (err) {
     console.error("Failed to create student:", err);
     return res.status(500).json({ message: "Failed to create student" });

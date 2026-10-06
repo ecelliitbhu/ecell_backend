@@ -4,11 +4,11 @@ import { requireAuth, requireRole } from "../middleware/auth.js";
 
 const router = express.Router();
 
-// GET /posts → Public paginated feed of internships for students
-// Query params: page (default 1), limit (default 10), search, type, skills
-router.get("/", async (req, res) => {
+// GET /posts or /posts/getinfo → Public paginated feed of internships for students
+// Query params: page (default 1), limit (default 50), search, type, skills
+router.get(["/", "/getinfo"], async (req, res) => {
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit) || 50;
   const { search, type, skills } = req.query;
 
   // Build where clause from optional filters
@@ -41,6 +41,9 @@ router.get("/", async (req, res) => {
           id: true,
           jobTitle: true,
           companyName: true,
+          jobDescription: true,
+          qualification: true,
+          experience: true,
           jobType: true,
           stipend: true,
           location: true,
@@ -48,7 +51,6 @@ router.get("/", async (req, res) => {
           applicationMethod: true,
           applicationLink: true,
           createdAt: true,
-          // NO applications or recruiter user data included — stops over-fetching
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -68,14 +70,21 @@ router.get("/", async (req, res) => {
 // GET /posts/recruiter → Recruiter's own posts (paginated dashboard feed)
 // Auth required. Only returns posts belonging to the logged-in recruiter.
 router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res) => {
-  const recruiterId = req.user.roleData?.recruiter?.id;
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) {
+      recruiterId = recruiter.id;
+    }
+  }
 
   if (!recruiterId) {
     return res.status(403).json({ message: "No recruiter profile linked to this account" });
   }
 
   const page = parseInt(req.query.page) || 1;
-  const limit = parseInt(req.query.limit) || 10;
+  const limit = parseInt(req.query.limit) || 20;
 
   try {
     const [posts, total] = await Promise.all([
@@ -88,6 +97,9 @@ router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res)
           recruiterId: true,
           jobTitle: true,
           companyName: true,
+          jobDescription: true,
+          qualification: true,
+          experience: true,
           jobType: true,
           stipend: true,
           location: true,
@@ -95,7 +107,7 @@ router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res)
           applicationMethod: true,
           applicationLink: true,
           createdAt: true,
-          _count: { select: { applications: true } }, // total applicant count — no PII
+          _count: { select: { applications: true } }, // applicant count
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -112,8 +124,8 @@ router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res)
   }
 });
 
-// GET /posts/:id → Single post details (public)
-router.get("/:id", async (req, res) => {
+// GET /posts/getpost/:id or /posts/:id → Single post details (public)
+router.get(["/getpost/:id", "/:id"], async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -135,12 +147,11 @@ router.get("/:id", async (req, res) => {
         createdAt: true,
         recruiter: {
           select: {
+            id: true,
             companyName: true,
             websiteUrl: true,
-            // NO user email or internal IDs
           },
         },
-        // NO full applications list — stops IDOR leaking all applicant data
       },
     });
 
@@ -155,10 +166,26 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// POST /posts → Create a new post
-// Auth required. recruiterId comes from req.user — NOT from req.body (security fix)
-router.post("/", requireAuth, requireRole("RECRUITER"), async (req, res) => {
-  const recruiterId = req.user.roleData?.recruiter?.id;
+// POST /posts or /posts/create → Create a new post
+// Auth required. recruiterId resolved securely from authenticated user
+router.post(["/", "/create"], requireAuth, requireRole("RECRUITER"), async (req, res) => {
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) {
+      recruiterId = recruiter.id;
+    }
+  }
+
+  if (!recruiterId && req.body.recruiterId) {
+    const recruiter = await prisma.recruiter.findFirst({
+      where: { id: req.body.recruiterId, userId: req.user.id },
+    });
+    if (recruiter) {
+      recruiterId = recruiter.id;
+    }
+  }
 
   if (!recruiterId) {
     return res.status(403).json({ message: "No recruiter profile linked to this account" });
@@ -199,11 +226,11 @@ router.post("/", requireAuth, requireRole("RECRUITER"), async (req, res) => {
         qualification,
         experience,
         stipend,
-        requiredSkills,
+        requiredSkills: Array.isArray(requiredSkills) ? requiredSkills : [],
         location,
-        jobType,
-        applicationMethod,
-        applicationLink,
+        jobType: jobType || "REMOTE",
+        applicationMethod: applicationMethod || "NATIVE",
+        applicationLink: applicationLink || null,
       },
       select: {
         id: true,
@@ -221,11 +248,16 @@ router.post("/", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   }
 });
 
-// PUT /posts/:id → Update a post
+// PUT /posts/:id or /posts/update/:id → Update a post
 // Auth required. Only the recruiter who owns the post can update it.
-router.put("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
+router.put(["/update/:id", "/:id"], requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
-  const recruiterId = req.user.roleData?.recruiter?.id;
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) recruiterId = recruiter.id;
+  }
 
   if (!recruiterId) {
     return res.status(403).json({ message: "No recruiter profile linked to this account" });
@@ -266,11 +298,11 @@ router.put("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
         qualification,
         experience,
         stipend,
-        requiredSkills,
+        requiredSkills: Array.isArray(requiredSkills) ? requiredSkills : [],
         location,
-        jobType,
-        applicationMethod,
-        applicationLink,
+        jobType: jobType || "REMOTE",
+        applicationMethod: applicationMethod || "NATIVE",
+        applicationLink: applicationLink || null,
       },
     });
 
@@ -281,11 +313,16 @@ router.put("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   }
 });
 
-// DELETE /posts/:id → Delete a post and its applications
+// DELETE /posts/:id or /posts/delete/:id → Delete a post and its applications
 // Auth required. Only the recruiter who owns the post can delete it.
-router.delete("/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
+router.delete(["/delete/:id", "/:id"], requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
-  const recruiterId = req.user.roleData?.recruiter?.id;
+  let recruiterId = req.user.roleData?.recruiter?.id;
+
+  if (!recruiterId) {
+    const recruiter = await prisma.recruiter.findUnique({ where: { userId: req.user.id } });
+    if (recruiter) recruiterId = recruiter.id;
+  }
 
   if (!recruiterId) {
     return res.status(403).json({ message: "No recruiter profile linked to this account" });

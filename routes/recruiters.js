@@ -4,14 +4,15 @@ import { requireAuth, requireRole, requireAdmin, requireAdminAccess } from "../m
 
 const router = express.Router();
 
-// GET /recruiters/getinfo/:id → Get recruiter by userId
-// Ownership check: you can only fetch your own profile
+// GET /recruiters/getinfo/:id → Get recruiter by userId or recruiter id
+// Ownership check: you can only fetch your own profile (or admin)
 router.get("/getinfo/:id", requireAuth, async (req, res) => {
   const { id } = req.params;
 
-  // Ownership check — the token's user ID must match the requested profile ID
+  // Ownership check — the token's user ID or recruiter ID must match the requested ID
   // Admins can view any recruiter's profile
-  if (req.user.id !== id) {
+  const isOwner = req.user?.id === id || req.user?.roleData?.recruiter?.id === id;
+  if (!isOwner) {
     const adminUsername = req.headers["x-admin-username"];
     const adminPassword = req.headers["x-admin-password"];
     if (
@@ -24,12 +25,14 @@ router.get("/getinfo/:id", requireAuth, async (req, res) => {
 
   try {
     // Flat select — every consumer of this endpoint (dashboard, profile,
-    // post-internship, post-login) only reads these fields. The old
-    // `posts: { include: { applications: true } }` pulled every post and every
-    // application row, cost 4 extra DB round trips per request, and was never
-    // rendered. Posts come from GET /posts/recruiter instead.
-    const recruiter = await prisma.recruiter.findUnique({
-      where: { userId: id },
+    // post-internship, post-login) only reads these fields.
+    const recruiter = await prisma.recruiter.findFirst({
+      where: {
+        OR: [
+          { userId: id },
+          { id: id }
+        ]
+      },
       select: {
         id: true,
         userId: true,
@@ -50,8 +53,7 @@ router.get("/getinfo/:id", requireAuth, async (req, res) => {
     if (!recruiter) {
       return res.status(404).json({
         error: "RECRUITER_NOT_FOUND",
-        message: "To access recruiter dashboard, kindly login as recruiter",
-        redirectTo: "/grow-your-resume/login",
+        message: "Recruiter profile not found",
       });
     }
 
@@ -69,21 +71,39 @@ router.get("/getinfo/:id", requireAuth, async (req, res) => {
 router.put("/update/:id", requireAuth, requireRole("RECRUITER"), async (req, res) => {
   const { id } = req.params;
 
-  // Ownership check
-  if (req.user.id !== id) {
+  // Ownership check — token user ID or recruiter ID must match
+  const isOwner = req.user?.id === id || req.user?.roleData?.recruiter?.id === id;
+  if (!isOwner) {
     return res.status(403).json({ message: "Forbidden: you can only update your own profile" });
   }
 
   const { companyName, address, websiteUrl, phoneNumber } = req.body;
 
   try {
-    const recruiter = await prisma.recruiter.update({
-      where: { userId: id },
-      data: {
-        companyName,
-        address,
-        websiteUrl,
-        phoneNumber,
+    // Determine userId
+    let targetUserId = req.user?.id;
+    if (req.user?.id === id) {
+      targetUserId = id;
+    } else {
+      const existing = await prisma.recruiter.findFirst({
+        where: { OR: [{ id }, { userId: id }] },
+      });
+      if (existing) targetUserId = existing.userId;
+    }
+
+    const data = {
+      companyName: companyName || "",
+      address: address || "",
+      websiteUrl: websiteUrl || "",
+      phoneNumber: phoneNumber || "",
+    };
+
+    const recruiter = await prisma.recruiter.upsert({
+      where: { userId: targetUserId },
+      update: data,
+      create: {
+        userId: targetUserId,
+        ...data,
       },
     });
 
@@ -96,7 +116,7 @@ router.put("/update/:id", requireAuth, requireRole("RECRUITER"), async (req, res
   }
 });
 
-// POST /recruiters → Create recruiter if not exists
+// POST /recruiters/register → Create recruiter if not exists
 router.post("/register", async (req, res) => {
   const { userId, companyName, websiteUrl, address, phoneNumber } = req.body;
 
@@ -105,82 +125,26 @@ router.post("/register", async (req, res) => {
   }
 
   try {
-    const existing = await prisma.recruiter.findUnique({
+    const data = {
+      companyName: companyName || "",
+      websiteUrl: websiteUrl || "",
+      address: address || "",
+      phoneNumber: phoneNumber || "",
+    };
+
+    const savedRecruiter = await prisma.recruiter.upsert({
       where: { userId },
-    });
-
-    if (existing) {
-      return res.status(200).json(existing);
-    }
-
-    const newRecruiter = await prisma.recruiter.create({
-      data: {
+      update: data,
+      create: {
         userId,
-        companyName: companyName || "", // fallback to empty string if undefined
-        websiteUrl: websiteUrl || "",
-        address: address || "",
-        phoneNumber: phoneNumber || "",
+        ...data,
       },
     });
 
-    return res.status(201).json(newRecruiter);
+    return res.status(200).json(savedRecruiter);
   } catch (err) {
     console.error("Failed to create recruiter:", err);
     return res.status(500).json({ message: "Failed to create recruiter" });
-  }
-});
-
-// GET /recruiters/pending -> Get unverified recruiters
-router.get("/pending", async (req, res) => {
-  try {
-    const pending = await prisma.recruiter.findMany({
-      where: { verified: false },
-      include: {
-        user: {
-          select: {
-            email: true,
-            createdAt: true,
-          },
-        },
-      },
-    });
-    return res.status(200).json(pending);
-  } catch (error) {
-    console.error("Error fetching pending recruiters:", error);
-    return res.status(500).json({ message: "Error fetching pending recruiters", error: error.message });
-  }
-});
-
-// PUT /recruiters/verify/:id -> Verify a recruiter
-router.put("/verify/:id", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const recruiter = await prisma.recruiter.update({
-      where: { id },
-      data: { verified: true },
-    });
-    return res.status(200).json(recruiter);
-  } catch (error) {
-    console.error("Error verifying recruiter:", error);
-    return res.status(500).json({ message: "Error verifying recruiter", error: error.message });
-  }
-});
-
-// PUT /recruiters/verify/:id → Approve a recruiter (Admin only)
-router.put("/verify/:id", requireAdminAccess, async (req, res) => {
-  const { id } = req.params;
-
-  try {
-    const recruiter = await prisma.recruiter.update({
-      where: { id },
-      data: { verified: true }
-    });
-
-    return res.status(200).json({ success:true , recruiter });
-  } catch (error) {
-    console.error("Error verifying recruiter:" , error);
-    return res.status(500)
-    .json({ success: false, message: "Verification failed", error: error.message });
   }
 });
 
@@ -188,7 +152,7 @@ router.put("/verify/:id", requireAdminAccess, async (req, res) => {
 router.get("/pending", requireAdminAccess, async (req, res) => {
   try {
     const pendingRecruiters = await prisma.recruiter.findMany({
-      where : { verified: false },
+      where: { verified: false },
       include: {
         user: {
           select: {
@@ -201,12 +165,26 @@ router.get("/pending", requireAdminAccess, async (req, res) => {
 
     return res.status(200).json(pendingRecruiters);
   } catch (error) {
-    console.error("Error fecthing pending recruiters:" , error);
-    return res.status(500)
-    .json({ success:false , message: "Failed to fetch pending recruiters" , error: error.message });
+    console.error("Error fetching pending recruiters:", error);
+    return res.status(500).json({ success: false, message: "Failed to fetch pending recruiters", error: error.message });
   }
 });
 
+// PUT /recruiters/verify/:id → Approve a recruiter (Admin only)
+router.put("/verify/:id", requireAdminAccess, async (req, res) => {
+  const { id } = req.params;
 
+  try {
+    const recruiter = await prisma.recruiter.update({
+      where: { id },
+      data: { verified: true },
+    });
+
+    return res.status(200).json({ success: true, recruiter });
+  } catch (error) {
+    console.error("Error verifying recruiter:", error);
+    return res.status(500).json({ success: false, message: "Verification failed", error: error.message });
+  }
+});
 
 export default router;
