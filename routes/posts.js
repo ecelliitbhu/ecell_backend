@@ -51,6 +51,7 @@ router.get(["/", "/getinfo"], async (req, res) => {
           applicationMethod: true,
           applicationLink: true,
           createdAt: true,
+          expiresAt: true,
         },
         orderBy: { createdAt: "desc" },
       }),
@@ -107,6 +108,7 @@ router.get("/recruiter", requireAuth, requireRole("RECRUITER"), async (req, res)
           applicationMethod: true,
           applicationLink: true,
           createdAt: true,
+          expiresAt: true,
           _count: { select: { applications: true } }, // applicant count
         },
         orderBy: { createdAt: "desc" },
@@ -145,6 +147,7 @@ router.get(["/getpost/:id", "/:id"], async (req, res) => {
         applicationMethod: true,
         applicationLink: true,
         createdAt: true,
+        expiresAt: true,
         recruiter: {
           select: {
             id: true,
@@ -203,6 +206,7 @@ router.post(["/", "/create"], requireAuth, requireRole("RECRUITER"), async (req,
     jobType,
     applicationMethod,
     applicationLink,
+    expiresAt,
   } = req.body;
 
   try {
@@ -231,6 +235,7 @@ router.post(["/", "/create"], requireAuth, requireRole("RECRUITER"), async (req,
         jobType: jobType || "REMOTE",
         applicationMethod: applicationMethod || "NATIVE",
         applicationLink: applicationLink || null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
       select: {
         id: true,
@@ -275,6 +280,7 @@ router.put(["/update/:id", "/:id"], requireAuth, requireRole("RECRUITER"), async
     jobType,
     applicationMethod,
     applicationLink,
+    expiresAt,
   } = req.body;
 
   try {
@@ -303,6 +309,7 @@ router.put(["/update/:id", "/:id"], requireAuth, requireRole("RECRUITER"), async
         jobType: jobType || "REMOTE",
         applicationMethod: applicationMethod || "NATIVE",
         applicationLink: applicationLink || null,
+        expiresAt: expiresAt ? new Date(expiresAt) : null,
       },
     });
 

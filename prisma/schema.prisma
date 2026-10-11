@@ -69,6 +69,7 @@ model Post {
   applicationMethod String        @default("NATIVE")
   applicationLink   String?
   createdAt         DateTime      @default(now())
+  expiresAt         DateTime?
   applications      Application[]
 
   @@index([recruiterId])
