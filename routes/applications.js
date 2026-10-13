@@ -368,6 +368,18 @@ router.post(["/", "/create"], requireAuth, async (req, res) => {
       actualStudentId = student.userId;
     }
 
+    const post = await prisma.post.findUnique({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+
+    if (post.expiresAt && new Date(post.expiresAt) < new Date()) {
+      return res.status(400).json({ message: "This internship application has closed." });
+    }
+
     const existingApplication = await prisma.application.findFirst({
       where: {
         studentId: actualStudentId,
@@ -399,6 +411,25 @@ router.post(["/", "/create"], requireAuth, async (req, res) => {
         post: { select: { id: true, companyName: true, jobTitle: true } },
       },
     });
+
+    // Webhook Trigger for Google Sheets (Flow A)
+    if (process.env.GYR_GOOGLE_SHEET_WEBHOOK_URL && student) {
+      fetch(process.env.GYR_GOOGLE_SHEET_WEBHOOK_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          studentName: student.name,
+          rollNo: student.rollNo,
+          branch: student.branch,
+          year: student.year,
+          cpi: student.cpi,
+          resumeUrl: student.resumeUrl,
+          linkedinUrl: student.linkedinUrl,
+          jobTitle: post.jobTitle,
+          companyName: post.companyName
+        })
+      }).catch(err => console.error("Webhook failed:", err));
+    }
 
     return res.status(201).json(application);
   } catch (error) {
