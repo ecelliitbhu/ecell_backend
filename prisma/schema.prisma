@@ -20,10 +20,12 @@ model User {
   email     String   @unique
   createdAt DateTime @default(now())
 
-  student    Student?
-  recruiter  Recruiter?
-  ambassador CampusAmbassador?
+  student              Student?
+  recruiter            Recruiter?
+  ambassador           CampusAmbassador?
+  registrationIntents  RegistrationIntent[]
 }
+
 
 model Student {
   id           String        @id @default(uuid())
@@ -167,3 +169,21 @@ model MissingEmails {
   email     String    @db.VarChar(255)
   logged_at DateTime? @default(now()) @db.Timestamp(6)
 }
+
+model RegistrationIntent {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String?   @map("user_id")
+  userEmail String    @map("user_email")
+  userName  String?   @map("user_name")
+  eventSlug String    @map("event_slug")
+  eventName String    @map("event_name")
+  platform  String?   @default("konfhub")
+  status    String?   @default("clicked")
+  createdAt DateTime? @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime? @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user      User?     @relation(fields: [userId], references: [id])
+
+  @@map("registration_intents")
+}
+

@@ -10,6 +10,7 @@ import postRoutes from "./routes/posts.js";
 import applicationRoutes from "./routes/applications.js";
 import userRoutes from "./routes/users.js";
 import pingRoute from "./routes/ping.js";
+import registrationIntentRoutes from "./routes/registrationIntents.js";
 import { requireAuth } from "./middleware/auth.js";
 
 const app = express();
@@ -20,6 +21,8 @@ app.use(express.json());
 app.use("/", pingRoute);
 app.use("/ping", pingRoute);
 app.use("/users", userRoutes); // must stay public — /users/create is hit pre-login by the signIn callback
+app.use("/registration-intents", registrationIntentRoutes);
+
 
 // protected routes
 app.use("/students", requireAuth, studentRoutes);
