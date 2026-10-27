@@ -64,6 +64,8 @@ router.put("/update/:id", requireRole("STUDENT"), async (req, res) => {
   }
   const {
     name,
+    collegeName,
+    phone,
     rollNo,
     branch,
     cpi,
@@ -72,11 +74,14 @@ router.put("/update/:id", requireRole("STUDENT"), async (req, res) => {
     linkedinUrl,
     githubUrl,
     resumeUrl,
+    portfolioUrl,
   } = req.body;
 
   try {
     const data = {
       name,
+      collegeName: collegeName !== undefined ? collegeName : "IIT (BHU) Varanasi",
+      phone: phone !== undefined ? phone : "",
       rollNo,
       branch,
       cpi: typeof cpi === "number" ? cpi : (Number.parseFloat(cpi) || 0),
@@ -85,6 +90,7 @@ router.put("/update/:id", requireRole("STUDENT"), async (req, res) => {
       linkedinUrl: linkedinUrl || "",
       githubUrl: githubUrl || "",
       resumeUrl: resumeUrl || "",
+      portfolioUrl: portfolioUrl || "",
     };
 
     const updated = await prisma.student.upsert({
@@ -108,6 +114,8 @@ router.post("/register", async (req, res) => {
   const {
     userId,
     name,
+    collegeName,
+    phone,
     rollNo,
     branch,
     cpi,
@@ -116,6 +124,7 @@ router.post("/register", async (req, res) => {
     linkedinUrl,
     githubUrl,
     resumeUrl,
+    portfolioUrl,
   } = req.body;
 
   if (!userId) {
@@ -125,6 +134,8 @@ router.post("/register", async (req, res) => {
   try {
     const data = {
       name: name || "",
+      collegeName: collegeName !== undefined ? collegeName : "IIT (BHU) Varanasi",
+      phone: phone !== undefined ? phone : "",
       rollNo: rollNo || "",
       branch: branch || "Architecture, Planning and Design",
       cpi: typeof cpi === "number" ? cpi : (Number.parseFloat(cpi) || 0),
@@ -133,6 +144,7 @@ router.post("/register", async (req, res) => {
       linkedinUrl: linkedinUrl || "",
       githubUrl: githubUrl || "",
       resumeUrl: resumeUrl || "",
+      portfolioUrl: portfolioUrl || "",
     };
 
     const savedStudent = await prisma.student.upsert({
